@@ -41,12 +41,20 @@ def generar_mensaje(nombre, documentos_faltantes, nombre_tecnologo):
     saludo = obtener_saludo()
     documentos_lista = [doc.strip() for doc in str(documentos_faltantes).split(',')]
     documentos_formateados = "\n".join([f"{i+1}. {doc}" for i, doc in enumerate(documentos_lista)])
-    mensaje = (f"{saludo} {nombre}, escribe Marlon Mosquera del Centro Agropecuario La Granja del Espinal. "
-               f"Estamos validando los documentos de matrícula para la tecnología en {nombre_tecnologo} y "
-               f"encontramos que se deben enviar nuevamente los siguientes documentos:\n\n"
-               f"{documentos_formateados}\n\n"
-               "Agradecemos el ajuste a los documentos y VOLVER A CARGAR TODO EL PAQUETE AL LINK DE MATRICULA. \n"
-               "Esto debe quedar listo en lo posible hoy mismo.")
+    mensaje = mensaje = (f"{saludo} {nombre},\n\n"
+           "Escribe Marlon Mosquera del Centro Agropecuario La Granja del Espinal. "
+           f"Estamos validando los documentos de matrícula para la tecnología en {nombre_tecnologo}. "
+           "Hemos identificado que es necesario enviar nuevamente los siguientes documentos:\n\n"
+           f"{documentos_formateados}\n\n"
+           "Por favor, realiza las correcciones indicadas y carga nuevamente todo el paquete completo, "
+           "incluyendo los documentos anteriormente mencionados, en el enlace de matrícula.\n\n"
+           "IMPORTANTE:\n"
+           "- En caso de faltar un documento, se debe enviar todo el paquete completo, no solo el documento faltante.\n"
+           "- Los reportes de EPS deben obtenerse directamente desde la página oficial de ADRES.\n"
+           "- Los resultados del ICFES deben generarse en formato PDF desde la página oficial (NO capturas de pantalla).\n\n"
+           "Te solicitamos realizar este proceso lo antes posible, preferiblemente el día de hoy.\n\n"
+           "Agradecemos tu colaboración.")
+
     return mensaje
 
 def enviar_mensaje(numero, mensaje, driver):
