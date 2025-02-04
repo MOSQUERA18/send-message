@@ -64,7 +64,7 @@ def enviar_mensaje(numero, mensaje, driver):
         driver.get(url)
         WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.XPATH, '//span[@data-icon="send"]'))
-        )
+        )     
         send_button = driver.find_element(By.XPATH, '//span[@data-icon="send"]')
         send_button.click()
         time.sleep(3)
