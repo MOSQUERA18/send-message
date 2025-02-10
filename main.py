@@ -18,6 +18,31 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 import tkinter.font as tkFont
+from dotenv import load_dotenv
+
+load_dotenv()
+REMITENTE = os.getenv("EMAIL_USER")
+CLAVE = os.getenv("PASSWORD")
+
+
+# Obtener la ruta de Descargas del usuario
+def obtener_ruta_descargas():
+    if os.name == "nt":  # Windows
+        return os.path.join(os.environ["USERPROFILE"], "Downloads")
+
+# Crear carpeta "Reporte de envíos" dentro de Descargas
+RUTA_REPORTE = os.path.join(obtener_ruta_descargas(), "Reporte de envíos")
+os.makedirs(RUTA_REPORTE, exist_ok=True)
+
+# Archivos de historial
+HISTORIAL_WHATSAPP = os.path.join(RUTA_REPORTE, "historial_whatsapp.txt")
+HISTORIAL_CORREOS = os.path.join(RUTA_REPORTE, "historial_correos.txt")
+
+def registrar_historial(archivo, destinatario, estado):
+    """ Registra el estado del envío en un archivo de historial. """
+    with open(archivo, "a", encoding="utf-8") as file:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        file.write(f"{timestamp}, {destinatario}, {estado}\n")
 
 
 
@@ -64,12 +89,6 @@ def mostrar_vista_previa(df, ruta_excel, opcion, ventana):
 
 
 
-def obtener_ruta_descargas():
-    """ Obtiene la ruta de la carpeta de Descargas del usuario """
-    if os.name == "nt":  # Windows
-        return os.path.join(os.environ["USERPROFILE"], "Downloads")
-    else:  # MacOS y Linux
-        return os.path.join(os.path.expanduser("~"), "Downloads")
 
 def descargar_plantilla(tipo):
     """ Descarga una plantilla de Excel en la carpeta de Descargas del usuario """
@@ -127,29 +146,58 @@ def obtener_saludo():
         return "Buenas noches"
 
 def generar_mensaje(nombre, remitente, mensaje_base):
-    """ Genera el mensaje con negritas y emojis para WhatsApp. """
-    saludo = obtener_saludo()  # Obtiene "Buenos días", "Buenas tardes" o "Buenas noches"
+    """ Genera el mensaje con negritas y emojis para WhatsApp y correo. """
+    saludo = obtener_saludo()
 
-    # Si el mensaje base está vacío, se usa un mensaje predeterminado
-    if pd.isna(mensaje_base) or mensaje_base.strip() == "":
+    # Asegurar que mensaje_base no sea None antes de hacer strip()
+    if not isinstance(mensaje_base, str) or mensaje_base.strip() == "":
         mensaje_base = "📌 *Por favor, revisa esta información importante.*"
 
-    # Formato del mensaje mejorado con negritas y emojis
     mensaje = (f"👋 *Hola {nombre}*, {saludo}.\n\n"
                f"✍️ *Escribe {remitente}* desde el *Centro Agropecuario La Granja.*\n\n"
                f"📢 {mensaje_base}\n\n"
                "Gracias por tu atención. ✅")
-
+    
     return mensaje
 
 
-def enviar_mensajes_whatsapp(ruta_excel, ventana):
-    """ Envía mensajes a WhatsApp usando los datos del Excel. """
-    mostrar_cargando(ventana)
+def mostrar_aviso():
+    """ Muestra un mensaje en la esquina inferior derecha sin bloquear el código QR. """
+    ventana_aviso = tk.Toplevel()
+        # Cambiar íconos
+    ventana_aviso.iconbitmap("C:\\send-message\\backend\\iconos\\send.ico") 
+    ventana_aviso.title("WhatsApp Web")
+    ventana_aviso.geometry("350x100")  # Tamaño de la ventana
 
-    datos = cargar_datos(ruta_excel)
-    if datos is None:
-        ocultar_cargando()
+    # Posicionar en la esquina inferior derecha
+    ventana_aviso.update_idletasks()
+    ancho_pantalla = ventana_aviso.winfo_screenwidth()
+    alto_pantalla = ventana_aviso.winfo_screenheight()
+    
+    x_pos = ancho_pantalla - 360  # Ajusta para que quede en la derecha
+    y_pos = alto_pantalla - 160   # Ajusta para que quede en la parte inferior
+    
+    ventana_aviso.geometry(f"350x100+{x_pos}+{y_pos}")  # Formato: ancho x alto + X + Y
+
+    # Mensaje dentro de la ventana
+    tk.Label(ventana_aviso, text="📢 Inicie sesión en WhatsApp Web\n y haga clic en 'Listo' para continuar.", 
+             font=("Arial", 11), fg="black").pack(pady=10)
+
+    # Botón de "Listo"
+    tk.Button(ventana_aviso, text="Listo", command=ventana_aviso.destroy, 
+              font=("Arial", 10, "bold"), bg="#2ecc71", fg="white").pack(pady=5)
+
+    ventana_aviso.attributes("-topmost", True)  # Mantener la ventana en primer plano
+    ventana_aviso.transient()  # Evita que la ventana se minimice junto con la principal
+    ventana_aviso.grab_set()   # Bloquea interacción con la ventana principal hasta que se cierre
+
+
+def enviar_mensajes_whatsapp(ruta_excel,ventana):
+    """ Envía mensajes de WhatsApp y registra el historial de envíos. """
+    try:
+        datos = pd.read_excel(ruta_excel)
+    except Exception as e:
+        print(f"❌ Error al cargar el archivo Excel: {e}")
         return
 
     chrome_options = Options()
@@ -157,15 +205,16 @@ def enviar_mensajes_whatsapp(ruta_excel, ventana):
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     driver.get("https://web.whatsapp.com/")
 
-    messagebox.showinfo("WhatsApp Web", "Inicie sesión en WhatsApp Web y presione Aceptar cuando los chats estén cargados.")
+    mostrar_aviso()
 
     for _, fila in datos.iterrows():
         nombre = fila.get("Nombre")
         numero_telefono = fila.get("Numero_Telefono")
-        remitente = fila.get("Remitente")  # Nombre de quien envía el mensaje
-        mensaje_base = fila.get("Mensaje")  # Mensaje personalizado
+        remitente = fila.get("Remitente")
+        mensaje_base = fila.get("Mensaje")
 
         if pd.isna(nombre) or pd.isna(numero_telefono) or pd.isna(remitente):
+            registrar_historial(HISTORIAL_WHATSAPP, numero_telefono, "DATOS INCOMPLETOS")
             continue
 
         mensaje = generar_mensaje(nombre, remitente, mensaje_base)
@@ -180,23 +229,21 @@ def enviar_mensajes_whatsapp(ruta_excel, ventana):
             send_button = driver.find_element(By.XPATH, '//span[@data-icon="send"]')
             send_button.click()
             time.sleep(3)
+
+            print(f"✅ Mensaje enviado a {numero_telefono}")
+            registrar_historial(HISTORIAL_WHATSAPP, numero_telefono, "ENVIADO")
+
         except Exception as e:
-            print(f"Error al enviar mensaje a {numero_telefono}: {e}")
+            print(f"❌ Error al enviar mensaje a {numero_telefono}: {e}")
+            registrar_historial(HISTORIAL_WHATSAPP, numero_telefono, f"NO ENVIADO - {str(e)}")
 
     driver.quit()
-    ocultar_cargando()
-    messagebox.showinfo("Finalizado", "Mensajes enviados correctamente.")
+    print("✅ Proceso de envío de WhatsApp finalizado.")
 
 
-def validar_archivo_excel(ruta_excel):
-    """ Verifica que el archivo tenga el formato correcto: 
-    - Solo archivos .xlsx
-    - No debe estar vacío
-    - Debe contener exactamente las columnas esperadas
-    """
-
+def validar_archivo_excel(ruta_excel, opcion):
+    """ Verifica que el archivo tenga el formato correcto según la opción seleccionada. """
     try:
-        # Cargar el archivo
         df = pd.read_excel(ruta_excel)
 
         # Verificar que el archivo no esté vacío
@@ -205,7 +252,13 @@ def validar_archivo_excel(ruta_excel):
             return False
 
         # Definir las columnas esperadas según el tipo de mensaje
-        columnas_esperadas = {"Nombre", "Numero_Telefono", "Remitente", "Mensaje"}
+        if opcion == 1:  # WhatsApp
+            columnas_esperadas = {"Nombre", "Numero_Telefono", "Remitente", "Mensaje"}
+        elif opcion == 2:  # Correo
+            columnas_esperadas = {"Nombre", "Correo", "Remitente", "Mensaje"}
+        else:
+            messagebox.showerror("Error", "⚠️ Opción de envío no válida.")
+            return False
 
         # Obtener las columnas reales del archivo
         columnas_actuales = set(df.columns)
@@ -240,7 +293,7 @@ def seleccionar_archivo(opcion, ventana):
         return  # Si el usuario cancela la selección, no hacer nada
 
     # Verificar si el archivo es válido
-    if not validar_archivo_excel(ruta_excel):
+    if not validar_archivo_excel(ruta_excel,opcion):
         return  # Si hay un error, mostrar alerta y salir
 
     # Cargar el archivo para mostrar vista previa
@@ -260,8 +313,8 @@ def procesar_correo(ruta_excel, ventana):
     for _, fila in datos.iterrows():
         nombre = fila.get("Nombre")
         correo = fila.get("Correo")
-        remitente = fila.get("Remitente")  # Nombre de quien envía el mensaje
-        mensaje_base = fila.get("Mensaje")  # Mensaje personalizado
+        remitente = fila.get("Remitente")
+        mensaje_base = fila.get("Mensaje")
 
         if pd.isna(nombre) or pd.isna(correo) or pd.isna(remitente):
             continue
@@ -274,24 +327,43 @@ def procesar_correo(ruta_excel, ventana):
 
 
 def enviar_correo(correo, mensaje):
+    """ Envía un correo y registra el estado del envío. """
     try:
-        remitente = ""
-        clave = ""
+        if not REMITENTE or not CLAVE:
+            print("⚠️ Error: Credenciales de correo no encontradas.")
+            registrar_historial(HISTORIAL_CORREOS, correo, "ERROR: Credenciales no configuradas")
+            return
+        
+        if not correo or "@" not in correo:
+            print(f"⚠️ Error: Dirección de correo no válida ({correo})")
+            registrar_historial(HISTORIAL_CORREOS, correo, "CORREO NO ENCONTRADO")
+            return
+
+        if not mensaje or mensaje.strip() == "":
+            print(f"⚠️ Error: Mensaje vacío para {correo}. No se enviará el correo.")
+            registrar_historial(HISTORIAL_CORREOS, correo, "NO ENVIADO - MENSAJE VACÍO")
+            return
+
         servidor = smtplib.SMTP("smtp.gmail.com", 587)
         servidor.starttls()
-        servidor.login(remitente, clave)
+        servidor.login(REMITENTE, CLAVE)
         
         correo_msg = MIMEMultipart()
-        correo_msg["From"] = remitente
+        correo_msg["From"] = REMITENTE
         correo_msg["To"] = correo
         correo_msg["Subject"] = "Información Importante"
         correo_msg.attach(MIMEText(mensaje, "plain"))
-        
-        servidor.sendmail(remitente, correo, correo_msg.as_string())
+
+        servidor.sendmail(REMITENTE, correo, correo_msg.as_string())
         servidor.quit()
-        print(f"Correo enviado correctamente a {correo}")
+
+        print(f"📧 Correo enviado correctamente a {correo}")
+        registrar_historial(HISTORIAL_CORREOS, correo, "ENVIADO")
+
     except Exception as e:
-        print(f"Error al enviar el correo a {correo}: {e}")
+        print(f"❌ Error al enviar el correo a {correo}: {e}")
+        registrar_historial(HISTORIAL_CORREOS, correo, f"NO ENVIADO - {str(e)}")
+
 
 
 
@@ -317,21 +389,21 @@ def agregar_reloj(ventana):
     
     obtener_tiempo()
 
-
 def iniciar_interfaz():
     global ventana
     
     ventana = Tk()
     
     # Colores suaves para el fondo
-    ventana.title("Envío de Mensajes Masivos a WhatsApp y Gmail")
-    ventana.geometry("500x400")
+    ventana.title("Envío de Mensajes Masivos Via WhatsApp y Gmail")
+    ventana.geometry("600x450")
     ventana.resizable(False, False)
     ventana.config(bg='#f4f4f9')  # Fondo de color suave (blanco sucio)
 
     # Establecer fuente personalizada
     font_button = tkFont.Font(family="Segoe UI", size=12, weight="bold")
     font_label = tkFont.Font(family="Segoe UI", size=16, weight="bold")
+    font_footer = tkFont.Font(family="Arial", size=10, weight="bold")
 
     # Cambiar íconos
     ventana.iconbitmap("C:\\send-message\\backend\\iconos\\send.ico") 
@@ -340,26 +412,25 @@ def iniciar_interfaz():
     icono_whatsapp = PhotoImage(file="C:\\send-message\\backend\\iconos\\wasap.png").subsample(8, 8)
     icono_gmail = PhotoImage(file="C:\\send-message\\backend\\iconos\\gmaili.png").subsample(8, 8)
     icono_exit = PhotoImage(file="C:\\send-message\\backend\\iconos\\exit.png").subsample(11, 11)
-    
-    agregar_reloj(ventana)  # Agregar el reloj en la esquina superior derecha
 
     # Label con color de fondo claro
     Label(ventana, text="Seleccione una opción", font=font_label, bg='#f4f4f9').pack(pady=10)
     
     # Botones con colores suaves, bordes redondeados y sombras
-    Button(ventana, text="Enviar mensajes a WhatsApp", command=lambda: seleccionar_archivo(1, ventana), 
+    Button(ventana, text="Enviar mensajes a WhatsApp", command=lambda: print("WhatsApp"), 
            width=30, height=2, font=font_button, relief="flat", bg='#3498db', fg='white', 
            activebackground='#2980b9').pack(pady=5)
-    Button(ventana, text="Enviar mensajes por Gmail", command=lambda: seleccionar_archivo(2, ventana), 
+    
+    Button(ventana, text="Enviar mensajes por Gmail", command=lambda: print("Gmail"), 
            width=30, height=2, font=font_button, relief="flat", bg='#e74c3c', fg='white', 
            activebackground='#c0392b').pack(pady=5)
 
-    Button(ventana, text="  ""Descargar plantilla WhatsApp", image=icono_whatsapp, compound="left", 
-           command=lambda: descargar_plantilla("whatsapp"), width=300, height=50, font=font_button, 
+    Button(ventana, text="Descargar plantilla WhatsApp", image=icono_whatsapp, compound="left", 
+           command=lambda: print("Plantilla WhatsApp"), width=300, height=50, font=font_button, 
            relief="flat", bg='#2ecc71', fg='white', activebackground='#27ae60').pack(pady=5)
     
-    Button(ventana, text="  ""Descargar plantilla Gmail", image=icono_gmail, compound="left", 
-           command=lambda: descargar_plantilla("gmail"), width=300, height=50, font=font_button, 
+    Button(ventana, text="Descargar plantilla Gmail", image=icono_gmail, compound="left", 
+           command=lambda: print("Plantilla Gmail"), width=300, height=50, font=font_button, 
            relief="flat", bg='#f39c12', fg='white', activebackground='#e67e22').pack(pady=5)
     
     Button(ventana, text="Salir", image=icono_exit, compound="left", 
@@ -367,7 +438,23 @@ def iniciar_interfaz():
         relief="flat", bg='#7f8c8d', fg='white', activebackground='#95a5a6',
         padx=10).pack(pady=2)
 
+    # 📌 Pie de página interactivo 📌
+    footer = Label(ventana, text="Desarrollado por Marlon Mosquera ADSO 2671143", font=font_footer, 
+                   bg='#f4f4f9', fg='#555', cursor="hand2")
+    footer.pack(side="bottom", pady=5)
+
+    # 🎨 Función para cambiar color en hover
+    def on_enter(e):
+        footer.config(fg="#3498db")  # Azul
+
+    def on_leave(e):
+        footer.config(fg="#555")  # Gris oscuro
+
+    # Asociar eventos hover
+    footer.bind("<Enter>", on_enter)
+    footer.bind("<Leave>", on_leave)
 
     ventana.mainloop()
+
 if __name__ == "__main__":
     iniciar_interfaz()
