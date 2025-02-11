@@ -252,11 +252,12 @@ def validar_archivo_excel(ruta_excel, opcion):
             return False
 
         # Definir las columnas esperadas según el tipo de mensaje
-        if opcion == 1:  # WhatsApp
-            columnas_esperadas = {"Nombre", "Numero_Telefono", "Remitente", "Mensaje"}
-        elif opcion == 2:  # Correo
-            columnas_esperadas = {"Nombre", "Correo", "Remitente", "Mensaje"}
-        else:
+        columnas_esperadas = {
+            1: {"Nombre", "Numero_Telefono", "Remitente", "Mensaje"},  # WhatsApp
+            2: {"Nombre", "Correo", "Remitente", "Mensaje"}  # Correo
+        }.get(opcion, None)
+
+        if columnas_esperadas is None:
             messagebox.showerror("Error", "⚠️ Opción de envío no válida.")
             return False
 
@@ -266,20 +267,31 @@ def validar_archivo_excel(ruta_excel, opcion):
         # Verificar si faltan columnas
         columnas_faltantes = columnas_esperadas - columnas_actuales
         if columnas_faltantes:
-            messagebox.showerror("Error", f"⚠️ Faltan las siguientes columnas en el archivo: {', '.join(columnas_faltantes)}")
+            messagebox.showerror("Error", f"⚠️ Faltan columnas en el archivo: {', '.join(columnas_faltantes)}")
             return False
 
-        # Verificar si hay columnas adicionales no permitidas
-        columnas_extras = columnas_actuales - columnas_esperadas
-        if columnas_extras:
-            messagebox.showwarning("Advertencia", f"⚠️ El archivo contiene columnas adicionales: {', '.join(columnas_extras)}.\n"
-                                                 "Solo se procesarán las columnas esperadas.")
+        # ⚠️ Solo realizar limpieza si es WhatsApp
+        if opcion == 1 and "Numero_Telefono" in df.columns:
+            df["Numero_Telefono"] = df["Numero_Telefono"].astype(str).str.replace(r'\D', '', regex=True)
+            df = df[df["Numero_Telefono"].str.len() >= 10]  # Asegurar que tenga al menos 10 dígitos
 
-        return True  # Si todo está correcto, retorna True
+        # ⚠️ Solo validar correos si es Gmail
+        if opcion == 2 and "Correo" in df.columns:
+            df = df[df["Correo"].str.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", na=False)]
+
+        # Verificar si después de la limpieza queda algún dato válido
+        if df.empty:
+            messagebox.showerror("Error", "⚠️ Todos los registros del archivo son inválidos.")
+            return False
+
+        return df  # Retorna el DataFrame limpio si es válido
 
     except Exception as e:
         messagebox.showerror("Error", f"⚠️ No se pudo leer el archivo Excel. Verifica que sea un archivo válido.\n\nError: {e}")
         return False
+
+
+
 
 
 def seleccionar_archivo(opcion, ventana):
@@ -292,13 +304,13 @@ def seleccionar_archivo(opcion, ventana):
     if not ruta_excel:
         return  # Si el usuario cancela la selección, no hacer nada
 
-    # Verificar si el archivo es válido
-    if not validar_archivo_excel(ruta_excel,opcion):
-        return  # Si hay un error, mostrar alerta y salir
+    df_validado = validar_archivo_excel(ruta_excel, opcion)
 
-    # Cargar el archivo para mostrar vista previa
-    df = pd.read_excel(ruta_excel)
-    mostrar_vista_previa(df, ruta_excel, opcion, ventana)  # Mostrar la vista previa antes de enviar
+    if df_validado is False:
+        return  # Si hay un error, salir sin continuar
+
+    # Mostrar la vista previa con el DataFrame validado
+    mostrar_vista_previa(df_validado, ruta_excel, opcion, ventana)
 
 
 def procesar_correo(ruta_excel, ventana):
@@ -417,20 +429,20 @@ def iniciar_interfaz():
     Label(ventana, text="Seleccione una opción", font=font_label, bg='#f4f4f9').pack(pady=10)
     
     # Botones con colores suaves, bordes redondeados y sombras
-    Button(ventana, text="Enviar mensajes a WhatsApp", command=lambda: print("WhatsApp"), 
+    Button(ventana, text="Enviar mensajes a WhatsApp", command=lambda: seleccionar_archivo(1, ventana), 
            width=30, height=2, font=font_button, relief="flat", bg='#3498db', fg='white', 
            activebackground='#2980b9').pack(pady=5)
     
-    Button(ventana, text="Enviar mensajes por Gmail", command=lambda: print("Gmail"), 
+    Button(ventana, text="Enviar mensajes por Gmail", command=lambda: seleccionar_archivo(2, ventana), 
            width=30, height=2, font=font_button, relief="flat", bg='#e74c3c', fg='white', 
            activebackground='#c0392b').pack(pady=5)
 
     Button(ventana, text="Descargar plantilla WhatsApp", image=icono_whatsapp, compound="left", 
-           command=lambda: print("Plantilla WhatsApp"), width=300, height=50, font=font_button, 
+           command=lambda: descargar_plantilla("whatsapp"), width=300, height=50, font=font_button, 
            relief="flat", bg='#2ecc71', fg='white', activebackground='#27ae60').pack(pady=5)
     
     Button(ventana, text="Descargar plantilla Gmail", image=icono_gmail, compound="left", 
-           command=lambda: print("Plantilla Gmail"), width=300, height=50, font=font_button, 
+           command=lambda: descargar_plantilla("Gmail"), width=300, height=50, font=font_button, 
            relief="flat", bg='#f39c12', fg='white', activebackground='#e67e22').pack(pady=5)
     
     Button(ventana, text="Salir", image=icono_exit, compound="left", 
