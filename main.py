@@ -154,7 +154,7 @@ def generar_mensaje(nombre, remitente, mensaje_base):
         mensaje_base = "📌 *Por favor, revisa esta información importante.*"
 
     mensaje = (f"👋 *Hola {nombre}*, {saludo}.\n\n"
-               f"✍️ *Escribe {remitente}* desde el *Centro Agropecuario La Granja.*\n\n"
+               f"✍️ *Escribo* desde el *Centro Agropecuario La Granja.*\n\n"
                f"📢 {mensaje_base}\n\n"
                "Gracias por tu atención. ✅")
     
@@ -254,7 +254,7 @@ def validar_archivo_excel(ruta_excel, opcion):
         # Definir las columnas esperadas según el tipo de mensaje
         columnas_esperadas = {
             1: {"Nombre", "Numero_Telefono", "Remitente", "Mensaje"},  # WhatsApp
-            2: {"Nombre", "Correo", "Remitente", "Mensaje"}  # Correo
+            2: {"Nombre", "Correo","Correo_Remitente", "Clave_Aplicacion", "Mensaje"}  # Correo
         }.get(opcion, None)
 
         if columnas_esperadas is None:
@@ -325,27 +325,31 @@ def procesar_correo(ruta_excel, ventana):
     for _, fila in datos.iterrows():
         nombre = fila.get("Nombre")
         correo = fila.get("Correo")
-        remitente = fila.get("Remitente")
+        remitente = fila.get("Correo_Remitente")  # Obtener el remitente del Excel
+        clave_aplicacion = fila.get("Clave_Aplicacion")  # Obtener la clave de aplicación
         mensaje_base = fila.get("Mensaje")
 
-        if pd.isna(nombre) or pd.isna(correo) or pd.isna(remitente):
+        if pd.isna(nombre) or pd.isna(correo) or pd.isna(remitente) or pd.isna(clave_aplicacion):
+            print(f"⚠️ Datos incompletos para {correo}. No se enviará el correo.")
+            registrar_historial(HISTORIAL_CORREOS, correo, "DATOS INCOMPLETOS")
             continue
 
         mensaje = generar_mensaje(nombre, remitente, mensaje_base)
-        enviar_correo(correo, mensaje)
+        enviar_correo(correo, mensaje, remitente, clave_aplicacion)
 
     ocultar_cargando()
     messagebox.showinfo("Finalizado", "Correos enviados correctamente.")
 
 
-def enviar_correo(correo, mensaje):
-    """ Envía un correo y registra el estado del envío. """
+
+def enviar_correo(correo, mensaje, remitente, clave_aplicacion):
+    """ Envía un correo con credenciales dinámicas obtenidas del Excel. """
     try:
-        if not REMITENTE or not CLAVE:
+        if not remitente or not clave_aplicacion:
             print("⚠️ Error: Credenciales de correo no encontradas.")
             registrar_historial(HISTORIAL_CORREOS, correo, "ERROR: Credenciales no configuradas")
             return
-        
+
         if not correo or "@" not in correo:
             print(f"⚠️ Error: Dirección de correo no válida ({correo})")
             registrar_historial(HISTORIAL_CORREOS, correo, "CORREO NO ENCONTRADO")
@@ -358,18 +362,18 @@ def enviar_correo(correo, mensaje):
 
         servidor = smtplib.SMTP("smtp.gmail.com", 587)
         servidor.starttls()
-        servidor.login(REMITENTE, CLAVE)
-        
+        servidor.login(remitente, clave_aplicacion)
+
         correo_msg = MIMEMultipart()
-        correo_msg["From"] = REMITENTE
+        correo_msg["From"] = remitente
         correo_msg["To"] = correo
         correo_msg["Subject"] = "Información Importante"
         correo_msg.attach(MIMEText(mensaje, "plain"))
 
-        servidor.sendmail(REMITENTE, correo, correo_msg.as_string())
+        servidor.sendmail(remitente, correo, correo_msg.as_string())
         servidor.quit()
 
-        print(f"📧 Correo enviado correctamente a {correo}")
+        print(f"📧 Correo enviado correctamente a {correo} desde {remitente}")
         registrar_historial(HISTORIAL_CORREOS, correo, "ENVIADO")
 
     except Exception as e:
