@@ -100,7 +100,7 @@ def descargar_plantilla(tipo):
         columnas = ["Nombre", "Numero_Telefono", "Remitente", "Mensaje"]
     else:
         ruta_guardado = os.path.join(ruta_descargas, "plantilla_correo.xlsx")
-        columnas = ["Nombre", "Correo", "Remitente", "Mensaje"]
+        columnas = ["Nombre", "Correo","Correo_Remitente", "Clave_Aplicacion", "Mensaje"]
 
     df = pd.DataFrame(columns=columnas)
     df.to_excel(ruta_guardado, index=False)
@@ -162,34 +162,32 @@ def generar_mensaje(nombre, remitente, mensaje_base):
 
 
 def mostrar_aviso():
-    """ Muestra un mensaje en la esquina inferior derecha sin bloquear el código QR. """
     ventana_aviso = tk.Toplevel()
-        # Cambiar íconos
-    ventana_aviso.iconbitmap("C:\\send-message\\backend\\iconos\\send.ico") 
+    ventana_aviso.iconbitmap("C:\\send-message\\backend\\iconos\\send.ico")
     ventana_aviso.title("WhatsApp Web")
-    ventana_aviso.geometry("350x100")  # Tamaño de la ventana
-
-    # Posicionar en la esquina inferior derecha
+    ventana_aviso.geometry("350x100")
+    
     ventana_aviso.update_idletasks()
     ancho_pantalla = ventana_aviso.winfo_screenwidth()
     alto_pantalla = ventana_aviso.winfo_screenheight()
-    
-    x_pos = ancho_pantalla - 360  # Ajusta para que quede en la derecha
-    y_pos = alto_pantalla - 160   # Ajusta para que quede en la parte inferior
-    
-    ventana_aviso.geometry(f"350x100+{x_pos}+{y_pos}")  # Formato: ancho x alto + X + Y
+    x_pos = ancho_pantalla - 360
+    y_pos = alto_pantalla - 160
+    ventana_aviso.geometry(f"350x100+{x_pos}+{y_pos}")
 
-    # Mensaje dentro de la ventana
-    tk.Label(ventana_aviso, text="📢 Inicie sesión en WhatsApp Web\n y haga clic en 'Listo' para continuar.", 
-             font=("Arial", 11), fg="black").pack(pady=10)
+    tk.Label(ventana_aviso, text="📢 Inicie sesión en WhatsApp Web\n y haga clic en 'Listo' para continuar.", font=("Arial", 11), fg="black").pack(pady=10)
 
-    # Botón de "Listo"
-    tk.Button(ventana_aviso, text="Listo", command=ventana_aviso.destroy, 
-              font=("Arial", 10, "bold"), bg="#2ecc71", fg="white").pack(pady=5)
+    listo_event = threading.Event()
 
-    ventana_aviso.attributes("-topmost", True)  # Mantener la ventana en primer plano
-    ventana_aviso.transient()  # Evita que la ventana se minimice junto con la principal
-    ventana_aviso.grab_set()   # Bloquea interacción con la ventana principal hasta que se cierre
+    def on_listo():
+        listo_event.set()
+        ventana_aviso.destroy()
+
+    tk.Button(ventana_aviso, text="Listo", command=on_listo, font=("Arial", 10, "bold"), bg="#2ecc71", fg="white").pack(pady=5)
+    ventana_aviso.attributes("-topmost", True)
+    ventana_aviso.transient()
+    ventana_aviso.grab_set()
+    ventana_aviso.wait_window()
+    return listo_event
 
 
 def enviar_mensajes_whatsapp(ruta_excel,ventana):
@@ -206,6 +204,7 @@ def enviar_mensajes_whatsapp(ruta_excel,ventana):
     driver.get("https://web.whatsapp.com/")
 
     mostrar_aviso()
+    
 
     for _, fila in datos.iterrows():
         nombre = fila.get("Nombre")
@@ -221,6 +220,8 @@ def enviar_mensajes_whatsapp(ruta_excel,ventana):
         mensaje_codificado = quote(mensaje)
         url = f"https://web.whatsapp.com/send?phone=+57{int(numero_telefono)}&text={mensaje_codificado}"
         driver.get(url)
+        listo_event = mostrar_aviso()
+        listo_event.wait()
 
         try:
             WebDriverWait(driver, 20).until(
@@ -250,6 +251,7 @@ def validar_archivo_excel(ruta_excel, opcion):
         if df.empty:
             messagebox.showerror("Error", "⚠️ El archivo Excel está vacío. Carga un archivo válido.")
             return False
+
 
         # Definir las columnas esperadas según el tipo de mensaje
         columnas_esperadas = {
