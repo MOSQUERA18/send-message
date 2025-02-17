@@ -413,13 +413,13 @@ def agregar_reloj(ventana):
 def iniciar_interfaz():
     global ventana
     
-    ventana = Tk()
+    ventana = tk.Tk()
     
     # Colores suaves para el fondo
     ventana.title("Envío de Mensajes Masivos Via WhatsApp y Gmail")
-    ventana.geometry("600x450")
+    ventana.geometry("600x460")
     ventana.resizable(False, False)
-    ventana.config(bg='#f4f4f9')  # Fondo de color suave (blanco sucio)
+    ventana.config(bg='#2c3e50')  # Fondo oscuro
 
     # Establecer fuente personalizada
     font_button = tkFont.Font(family="Segoe UI", size=12, weight="bold")
@@ -434,34 +434,38 @@ def iniciar_interfaz():
     icono_gmail = PhotoImage(file="C:\\send-message\\backend\\iconos\\gmaili.png").subsample(8, 8)
     icono_exit = PhotoImage(file="C:\\send-message\\backend\\iconos\\exit.png").subsample(11, 11)
 
+    # Frame para el contenido principal
+    frame_principal = tk.Frame(ventana, bg='#34495e', padx=20, pady=20)
+    frame_principal.pack(expand=True, fill='both')
+
     # Label con color de fondo claro
-    Label(ventana, text="Seleccione una opción", font=font_label, bg='#f4f4f9').pack(pady=10)
+    Label(frame_principal, text="Seleccione una opción", font=font_label, bg='#34495e', fg='white').pack(pady=10)
     
     # Botones con colores suaves, bordes redondeados y sombras
-    Button(ventana, text="Enviar mensajes a WhatsApp", command=lambda: seleccionar_archivo(1, ventana), 
+    Button(frame_principal, text="Enviar mensajes a WhatsApp", command=lambda: seleccionar_archivo(1, ventana), 
            width=30, height=2, font=font_button, relief="flat", bg='#3498db', fg='white', 
            activebackground='#2980b9').pack(pady=5)
     
-    Button(ventana, text="Enviar mensajes por Gmail", command=lambda: seleccionar_archivo(2, ventana), 
+    Button(frame_principal, text="Enviar mensajes por Gmail", command=lambda: seleccionar_archivo(2, ventana), 
            width=30, height=2, font=font_button, relief="flat", bg='#e74c3c', fg='white', 
            activebackground='#c0392b').pack(pady=5)
-
-    Button(ventana, text="Descargar plantilla WhatsApp", image=icono_whatsapp, compound="left", 
+ 
+    Button(frame_principal, text="   " "Descargar plantilla WhatsApp", image=icono_whatsapp, compound="left", 
            command=lambda: descargar_plantilla("whatsapp"), width=300, height=50, font=font_button, 
-           relief="flat", bg='#2ecc71', fg='white', activebackground='#27ae60').pack(pady=5)
+           relief="flat", bg='#008B8B', fg='white', activebackground='#27ae60').pack(pady=5)
     
-    Button(ventana, text="Descargar plantilla Gmail", image=icono_gmail, compound="left", 
+    Button(frame_principal, text="   " "Descargar plantilla Gmail", image=icono_gmail, compound="left", 
            command=lambda: descargar_plantilla("Gmail"), width=300, height=50, font=font_button, 
            relief="flat", bg='#f39c12', fg='white', activebackground='#e67e22').pack(pady=5)
     
-    Button(ventana, text="Salir", image=icono_exit, compound="left", 
+    Button(frame_principal, text="Salir", image=icono_exit, compound="left", 
         command=ventana.quit, width=285, height=50, font=font_button, 
         relief="flat", bg='#7f8c8d', fg='white', activebackground='#95a5a6',
         padx=10).pack(pady=2)
 
     # 📌 Pie de página interactivo 📌
     footer = Label(ventana, text="Desarrollado por Marlon Mosquera ADSO 2671143", font=font_footer, 
-                   bg='#f4f4f9', fg='#555', cursor="hand2")
+                   bg='#2c3e50', fg='white', cursor="hand2")
     footer.pack(side="bottom", pady=5)
 
     # 🎨 Función para cambiar color en hover
@@ -469,7 +473,7 @@ def iniciar_interfaz():
         footer.config(fg="#3498db")  # Azul
 
     def on_leave(e):
-        footer.config(fg="#555")  # Gris oscuro
+        footer.config(fg='white')  # Blanco
 
     # Asociar eventos hover
     footer.bind("<Enter>", on_enter)
