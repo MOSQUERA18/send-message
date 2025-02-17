@@ -190,10 +190,14 @@ def mostrar_aviso():
     return listo_event
 
 
-def enviar_mensajes_whatsapp(ruta_excel,ventana):
+def enviar_mensajes_whatsapp(ruta_excel, ventana):
     """ Envía mensajes de WhatsApp y registra el historial de envíos. """
     try:
         datos = pd.read_excel(ruta_excel)
+         # ✅ Limpiar los números de teléfono para eliminar espacios
+        if "Numero_Telefono" in datos.columns:
+            datos["Numero_Telefono"] = datos["Numero_Telefono"].astype(str).str.replace(r"\D", "", regex=True)
+
     except Exception as e:
         print(f"❌ Error al cargar el archivo Excel: {e}")
         return
@@ -203,12 +207,17 @@ def enviar_mensajes_whatsapp(ruta_excel,ventana):
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     driver.get("https://web.whatsapp.com/")
 
-    mostrar_aviso()
-    
+    # ✅ Mostrar el aviso una sola vez y esperar a que se cierre
+    listo_event = mostrar_aviso()
+    listo_event.wait()
 
     for _, fila in datos.iterrows():
         nombre = fila.get("Nombre")
         numero_telefono = fila.get("Numero_Telefono")
+        if not numero_telefono.isdigit():  # ✅ Validar que solo tenga números
+                print(f"❌ Número inválido: {numero_telefono}")
+                registrar_historial(HISTORIAL_WHATSAPP, numero_telefono, "NÚMERO INVÁLIDO")
+                continue
         remitente = fila.get("Remitente")
         mensaje_base = fila.get("Mensaje")
 
@@ -220,16 +229,13 @@ def enviar_mensajes_whatsapp(ruta_excel,ventana):
         mensaje_codificado = quote(mensaje)
         url = f"https://web.whatsapp.com/send?phone=+57{int(numero_telefono)}&text={mensaje_codificado}"
         driver.get(url)
-        listo_event = mostrar_aviso()
-        listo_event.wait()
 
         try:
+            # ✅ Espera a que aparezca el botón de enviar
             WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.XPATH, '//span[@data-icon="send"]'))
-            )
-            send_button = driver.find_element(By.XPATH, '//span[@data-icon="send"]')
-            send_button.click()
-            time.sleep(3)
+                EC.element_to_be_clickable((By.XPATH, '//span[@data-icon="send"]'))
+            ).click()
+            time.sleep(2)
 
             print(f"✅ Mensaje enviado a {numero_telefono}")
             registrar_historial(HISTORIAL_WHATSAPP, numero_telefono, "ENVIADO")
@@ -240,6 +246,7 @@ def enviar_mensajes_whatsapp(ruta_excel,ventana):
 
     driver.quit()
     print("✅ Proceso de envío de WhatsApp finalizado.")
+
 
 
 def validar_archivo_excel(ruta_excel, opcion):
@@ -291,10 +298,6 @@ def validar_archivo_excel(ruta_excel, opcion):
     except Exception as e:
         messagebox.showerror("Error", f"⚠️ No se pudo leer el archivo Excel. Verifica que sea un archivo válido.\n\nError: {e}")
         return False
-
-
-
-
 
 def seleccionar_archivo(opcion, ventana):
     """ Permite seleccionar solo archivos Excel (.xlsx) y valida su contenido. """

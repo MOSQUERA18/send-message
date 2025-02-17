@@ -8,4 +8,4 @@ ingresas hasta la carpeta completa
 cd send-message
 ejecutas este comando:
 
-pyinstaller --onefile --noconsole --add-data "backend/iconos/*;backend/iconos" main.py
+pyinstaller --onefile --noconsole --icon="backend/iconos/envio_wasap.ico" main.py
