@@ -1,5 +1,8 @@
 Instalar python 3.11
+https://www.python.org/downloads/release/python-3113/
+
 Instalar vscode
+https://code.visualstudio.com/download
 
 
 ejecutar este comando mediante cmd o desde la consola de vscode 
